@@ -68,6 +68,18 @@ public final class World {
         w.set(30,65,51,Block.ICE);
         w.updateLighting(); return w;
     }
+    /** Finite development terrain for the requested Default menu choice, not the 1.0 generator. */
+    public static World defaultTerrain(long seed) {
+        World w=new World(); w.randomState=seed==0?1:seed;
+        for(int z=0;z<SIZE;z++) for(int x=0;x<SIZE;x++) {
+            w.biomes[z*SIZE+x]=(byte)Biome.PLAINS.ordinal();
+            int top=64+(int)(Math.sin((x+(seed&255))*.15)*2+Math.cos((z+(seed>>>8&255))*.13)*2);
+            w.set(x,0,z,Block.BEDROCK);
+            for(int y=1;y<=top;y++) w.set(x,y,z,y==top?Block.GRASS:y>=top-3?Block.DIRT:Block.STONE);
+        }
+        for(int z=8;z<56;z+=12) for(int x=8;x<56;x+=12) { int y=127; while(y>0 && w.get(x,y,z)==Block.AIR) y--; w.growTree(x,y+1,z); }
+        w.updateLighting(); return w;
+    }
     public void tick() {
         time++;
         int budget=4096;

@@ -13,14 +13,15 @@ public final class WorldMesher {
     private static final int[] ORDER={0,1,2,0,2,3};
     private static final float[] SHADES={.6f,.6f,1f,.5f,.8f,.8f};
     private WorldMesher() {}
-    public static void build(World w,int chunkX,int chunkZ,Mesh.Builder opaque,Mesh.Builder transparent) {
+    public static void build(World w,int chunkX,int chunkZ,Mesh.Builder opaque,Mesh.Builder transparent) { build(w,chunkX,chunkZ,opaque,transparent,true,true); }
+    public static void build(World w,int chunkX,int chunkZ,Mesh.Builder opaque,Mesh.Builder transparent,boolean fancy,boolean smooth) {
         for(int y=0;y<World.HEIGHT;y++) for(int z=chunkZ*16;z<(chunkZ+1)*16;z++) for(int x=chunkX*16;x<(chunkX+1)*16;x++) {
             Block b=w.get(x,y,z); if(b==Block.AIR) continue;
             Mesh.Builder target=b==Block.WATER || b==Block.ICE || b==Block.GLASS ? transparent : opaque;
             if(b.plant()) { plant(w,x,y,z,b,target); continue; }
             for(int face=0;face<6;face++) {
                 int[] d=World.DIRECTIONS[face]; Block neighbor=w.get(x+d[0],y+d[1],z+d[2]);
-                if(neighbor.opaque || neighbor==b && (b.fluid() || b==Block.GLASS || b==Block.LEAVES || b==Block.ICE)) continue;
+                if(neighbor.opaque || neighbor==Block.LEAVES && !fancy && b==Block.LEAVES || neighbor==b && (b.fluid() || b==Block.GLASS || b==Block.LEAVES || b==Block.ICE)) continue;
                 int color=b.tinted(face)?b==Block.LEAVES?w.biome(x,z).foliageColor():w.biome(x,z).grassColor():0xffffff;
                 float sky=w.sky(x+d[0],y+d[1],z+d[2])/15f,light=Math.max(w.emission(x,y,z),w.light(x+d[0],y+d[1],z+d[2]))/15f;
                 float[][] corners=FACES[face];
@@ -28,7 +29,7 @@ public final class WorldMesher {
                     float[] v=corners[order]; float px=v[0],pz=v[2];
                     if(b==Block.CACTUS) { px=.0625f+px*.875f; pz=.0625f+pz*.875f; }
                     float py=v[1]*(float)b.height(w.data(x,y,z));
-                    float shade=SHADES[face]*occlusion(w,x,y,z,face,order);
+                    float shade=SHADES[face]*(smooth?occlusion(w,x,y,z,face,order):1);
                     emit(target,x+px,y+py,z+pz,b==Block.FURNACE && face==4 && w.emission(x,y,z)>0?58:b.tile(face),order,color,shade,sky,light);
                 }
             }

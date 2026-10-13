@@ -29,4 +29,5 @@ jobs:
           path: |
             target/skyblock-classic-0.1.0.jar
             target/smoke-*.png
+            target/menu-*.png
             target/surefire-reports/*.xml

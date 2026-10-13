@@ -33,7 +33,11 @@ src/main/java/dev/skyblock/
   ui/
     BitmapFont.java          original ASCII pixel glyph arrays
     Canvas.java              batched GL pixel quads and item icons
-    Interface.java           screen transitions, storage/crafting clicks, HUD and guide
+    Interface.java           HUD and shared storage-slot component, screen-stack integration
+    menu/                    per-screen classes, screen stack, application actions and localization
+    widget/                  buttons, sliders, text fields and selection lists
+  client/                    persisted options, remapped bindings and native texture-pack loading
+  network/                   validated server addresses and cancellable legacy server ping
   audio/SynthAudio.java       generated PCM and bounded asynchronous sound queue
   persistence/SaveStore.java  bounded/validated GZIP serialization and atomic replacement
   persistence/MouseSettingsStore.java  atomic, user-wide mouse preferences

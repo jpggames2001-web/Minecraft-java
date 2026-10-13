@@ -11,13 +11,32 @@ public final class Assets implements AutoCloseable {
     public static final int TILE=16, COLUMNS=8, SIZE=128;
     private final int[] pixels=new int[SIZE*SIZE];
     public final int texture;
+    private final int[] defaults;
+    private java.awt.image.BufferedImage previewImage;
     public Assets() {
-        generate(); ByteBuffer bytes=BufferUtils.createByteBuffer(SIZE*SIZE*4);
+        generate(); defaults=pixels.clone(); ByteBuffer bytes=BufferUtils.createByteBuffer(SIZE*SIZE*4);
         for(int argb:pixels) bytes.put((byte)(argb>>16)).put((byte)(argb>>8)).put((byte)argb).put((byte)(argb>>>24));
         bytes.flip(); texture=glGenTextures(); glBindTexture(GL_TEXTURE_2D,texture);
         glTexImage2D(GL_TEXTURE_2D,0,GL_RGBA8,SIZE,SIZE,0,GL_RGBA,GL_UNSIGNED_BYTE,bytes);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_NEAREST); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_S,GL_CLAMP_TO_EDGE); glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_WRAP_T,GL_CLAMP_TO_EDGE);
+    }
+    public java.awt.image.BufferedImage proceduralImage() {
+        var image=new java.awt.image.BufferedImage(SIZE,SIZE,java.awt.image.BufferedImage.TYPE_INT_ARGB);
+        image.setRGB(0,0,SIZE,SIZE,defaults,0,SIZE); return image;
+    }
+    public void apply(java.awt.image.BufferedImage image) {
+        System.arraycopy(defaults,0,pixels,0,pixels.length);
+        if(image!=null) for(int y=0;y<SIZE;y++) for(int x=0;x<SIZE;x++) if((y/16)*8+x/16<59) pixels[y*SIZE+x]=image.getRGB(x,y);
+        ByteBuffer data=BufferUtils.createByteBuffer(SIZE*SIZE*4);
+        for(int c:pixels) data.put((byte)(c>>16)).put((byte)(c>>8)).put((byte)c).put((byte)(c>>>24));
+        data.flip(); glBindTexture(GL_TEXTURE_2D,texture); glTexSubImage2D(GL_TEXTURE_2D,0,0,0,SIZE,SIZE,GL_RGBA,GL_UNSIGNED_BYTE,data); previewImage=null;
+    }
+    public void preview(java.awt.image.BufferedImage image) {
+        if(previewImage==image) return; previewImage=image;
+        ByteBuffer bytes=BufferUtils.createByteBuffer(16*16*4);
+        for(int y=0;y<16;y++) for(int x=0;x<16;x++) { int c=image.getRGB(x*image.getWidth()/16,y*image.getHeight()/16); bytes.put((byte)(c>>16)).put((byte)(c>>8)).put((byte)c).put((byte)(c>>>24)); }
+        bytes.flip(); glBindTexture(GL_TEXTURE_2D,texture); glTexSubImage2D(GL_TEXTURE_2D,0,112,112,16,16,GL_RGBA,GL_UNSIGNED_BYTE,bytes);
     }
     private void generate() {
         int[] bases={0xbcbcbc,0x866446,0x866446,0x898989,0x737575,0x414147,0x795530,0xa3814e,0xa0a0a0,0xa77d4c,0xdccc8b,0xd2edf3,0x315dd4,0xf97514,0x9b733a,0x93632b,0xa87c4b,0xa27643,0x68696a,0x835622,0x221d37,0xeaf4f4,0x457e32,0x528a3a,0x407736,0x805b37,0x799636,0xa5cee7,0x717373,0x828080,0xe3ded7,0x9a553f,0x646464,0x747474};
@@ -43,6 +62,7 @@ public final class Assets implements AutoCloseable {
                     case 20 -> { if(random.nextInt(7)==0) c=0x564064; }
                     case 22 -> { if(x%4==1) c=0x294e20; if(x%4==2 && y%5==0) c=0xb4ae65; }
                     case 24 -> { alpha=0; if(y>8 && x>=7 && x<=8) { c=0x69482e; alpha=255; } else if(y>=2 && y<=10 && Math.abs(x-7)<(y<6?y/2+1:5)) { c=shade(0x3c8b30,random.nextInt(40)); alpha=255; } }
+                    case 59,60,61 -> { c=shade(tile==60?0x929ac0:tile==61?0x383838:0x737373,random.nextInt(14)-7); alpha=255; if(x<2 || y<2) c=tile==61?0x292929:0xa6a6a6; if(x>13 || y>13) c=0x292929; }
                     case 53 -> { c=0xfff3ae; alpha=255; }
                     case 54 -> { c=shade(0xd6dae1,random.nextInt(40)-20); alpha=255; }
                     case 55 -> { c=0xffffff; alpha=255; }

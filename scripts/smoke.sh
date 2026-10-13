@@ -26,3 +26,4 @@ done
 export DISPLAY=":$(cat target/display-number)"
 bash scripts/run.sh --smoke 120 --no-audio --screenshot target/smoke-game.png
 bash scripts/run.sh --smoke 35 --no-audio --screenshot target/smoke-inventory.png
+bash scripts/run.sh --smoke 120 --smoke-menus --no-audio --screenshot target/smoke-menu-final.png

@@ -76,11 +76,13 @@ The cloud machine has a virtual display for automated graphics checks. Onboardin
 | Inventory move / split / transfer | Left click / right click / Shift-click |
 | Eat | Hold right mouse with food selected |
 
-Open **Esc → Controls** (or Controls on the title screen) to view the current keybindings, toggle **Invert Mouse X** and **Invert Mouse Y**, and adjust sensitivity with **− / +**. Both axes default to OFF. Moving the mouse right turns right, and moving it down looks down; each inversion changes only its own axis. Reset Mouse Defaults restores non-inverted controls and the original sensitivity (100% = 0.15 degrees per cursor pixel).
+Open **Esc → Options → Controls** (or Options → Controls on the title screen) to view the current keybindings, toggle **Invert Mouse X** and **Invert Mouse Y**, and adjust sensitivity with its slider. Both axes default to OFF. Moving the mouse right turns right, and moving it down looks down; each inversion changes only its own axis. Reset restores non-inverted controls and the original sensitivity (100% = 0.15 degrees per cursor pixel).
 
-Changes are saved immediately to `~/.skyblock-classic/controls.properties`, independently of world saves. To use another file, launch with `--settings local/controls.properties`. If a setting cannot be saved, the controls screen displays the error and retains the previous saved setting. Keyboard bindings are displayed for reference; rebinding is not implemented.
+Changes are saved immediately to `~/.skyblock-classic/controls.properties`, independently of world saves. To use another file, launch with `--settings local/controls.properties`. If a setting cannot be saved, the controls screen displays the error and retains the previous saved setting. Click a binding to assign a keyboard key or mouse button. Conflicts appear in red; Clear unbinds the action and Reset restores defaults. Scroll to access every binding.
 
 Existing version-1 worlds load with their camera orientation preserved. New saves use version 2 to record the corrected yaw convention; older binaries cannot load version-2 saves.
+
+On the title screen choose **Singleplayer → Create New World → SkyBlock**. Existing legacy saves appear in Select World, and named worlds support load/rename/confirmed delete. Video, sound, language and native texture-pack options are available under Options. Multiplayer currently performs real legacy server pings but cannot join networked worlds. See [MENUS.md](docs/MENUS.md) for implemented flows and precise limitations.
 
 Start by opening the chest, collecting the starter supplies, harvesting the tree, and crafting planks, sticks, a table and a wooden pickaxe. Ice above solid ground becomes water when broken. Put water next to **flowing** lava to produce cobblestone; water beside a lava source produces obsidian. Keep a sapling and avoid losing essential supplies into the void.
 
@@ -92,9 +94,10 @@ Start by opening the chest, collecting the starter supplies, harvesting the tree
 - Shaped/mirrored and shapeless crafting, 2×2 and 3×3 grids, fuel-based furnaces with 200-tick smelting, hoes, wheat, hydration, bone meal and sapling growth.
 - 15-level skylight and block-light flooding, torch/lava/burning-furnace emission, day/night sky changes, 16 biome identifiers with climate parameters and generated interpolated tint palettes.
 - Chunk VBO meshes, texture atlas, transparency, basic ambient occlusion, fog, generated celestial billboards, first-person hand/item geometry and an original pixel UI.
+- A component/screen-stack menu system with world/server management, remapped controls, persisted options, synthetic volume channels, language selection and native custom texture packs.
 - GZIP saves with corruption checks, atomic replacement, persistent inventories, entities, furnace progress, random state and scheduled fluid/block ticks. A corrupt save is rejected before gameplay and is not silently overwritten.
 
-Save files default to `~/.skyblock-classic/world.dat` (Windows: under your user profile). Screenshots are written alongside the save. The format is private to this project and does not read Minecraft worlds.
+The legacy save defaults to `~/.skyblock-classic/world.dat` (Windows: under your user profile). New named worlds live under `.skyblock-classic/worlds/<UUID>`. Screenshots are written alongside the save. The format is private to this project and does not read Minecraft worlds.
 
 ```bash
 bash scripts/run.sh --save local/world.dat
@@ -105,7 +108,7 @@ bash scripts/run.sh --no-audio
 bash scripts/run.sh --trace target/physics.csv
 ```
 
-`--fresh` starts a new island and **replaces the selected save on exit**; use a separate path when keeping an existing world. Creative mode currently provides unlimited placement, immunity and a starter palette; it does not implement the complete original creative inventory or flying system.
+`--fresh` prepares a new legacy island and **replaces the selected legacy save on startup**; use a separate path when keeping an existing world. Creative mode currently provides unlimited placement, immunity and a starter palette; it does not implement the complete original creative inventory or flying system.
 
 ## Verification and architecture
 

@@ -26,11 +26,15 @@ java -jar skyblock-classic-linux-0.1.0.jar
 
 No Arch Linux, o Java pode ser instalado com `sudo pacman -S jre21-openjdk`. A construção a partir do código exige o JDK em vez de somente JRE; veja o README principal.
 
+## Primeira partida
+
+Na tela inicial, escolha **Singleplayer → Create New World**, selecione **SkyBlock** e crie o mundo. Saves antigos aparecem em Select World. Os menus Options possuem video, controles, audio, idiomas e pacotes de textura locais. A consulta de servidores funciona, mas a entrada em mundos multiplayer ainda não está implementada. Consulte `docs/MENUS.md` para os limites de fidelidade.
+
 ## Controles
 
 WASD para mover, mouse para olhar, espaço para pular, Shift para agachar, Ctrl para correr, clique esquerdo para quebrar, direito para usar/colocar, E para inventário, R para receitas e Esc para pausar. Abra o baú para retirar os itens iniciais. F2 salva uma captura de tela; F3 mostra informações de depuração.
 
-Abra **Esc → Controls** para inverter X/Y separadamente ou ajustar a sensibilidade do mouse. As mudanças são salvas imediatamente em `.skyblock-classic/controls.properties`, na pasta do seu usuário, e permanecem após fechar o jogo. Os dois eixos vêm sem inversão por padrão. O menu também mostra as teclas atuais; não permite remapeá-las.
+Abra **Esc → Options → Controls** para inverter X/Y separadamente ou ajustar a sensibilidade do mouse. As mudanças são salvas imediatamente em `.skyblock-classic/controls.properties`, na pasta do seu usuário, e permanecem após fechar o jogo. Os dois eixos vêm sem inversão por padrão. Clique em uma tecla para remapeá-la; conflitos aparecem em vermelho. Use Clear para limpar e Reset para restaurar.
 
 O mundo é salvo automaticamente ao sair, em `.skyblock-classic/world.dat` dentro da pasta do seu usuário. Para testar com um arquivo separado:
 

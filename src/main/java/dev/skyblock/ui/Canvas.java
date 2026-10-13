@@ -22,12 +22,19 @@ public final class Canvas implements AutoCloseable {
     public int width,height,scale;
     private final Assets assets;
     public Canvas(Assets assets) { this.assets=assets; }
-    public void begin(int pixelsWide,int pixelsHigh) { scale=Math.max(1,Math.min(pixelsWide/640,pixelsHigh/360)); width=pixelsWide/scale; height=pixelsHigh/scale; builder=new Mesh.Builder(); }
+    public void begin(int pixelsWide,int pixelsHigh) { begin(pixelsWide,pixelsHigh,Math.max(1,Math.min(pixelsWide/640,pixelsHigh/360))); }
+    public void begin(int pixelsWide,int pixelsHigh,int requestedScale) { scale=requestedScale; width=pixelsWide/scale; height=pixelsHigh/scale; builder=new Mesh.Builder(); }
     public void rect(float x,float y,float w,float h,int argb) { quad(x,y,w,h,0,0,0,0,argb,false); }
     public void tile(int tile,float x,float y,float size,int color) {
         float u=(tile%8*16+.01f)/128,v=(tile/8*16+.01f)/128;
         quad(x,y,size,size,u,v,u+15.98f/128,v+15.98f/128,color,true);
     }
+    public void nineSlice(int tile,int x,int y,int w,int h) {
+        int[] source={0,2,14,16},dx={x,x+2,x+w-2,x+w},dy={y,y+2,y+h-2,y+h};
+        for(int row=0;row<3;row++) for(int col=0;col<3;col++) quad(dx[col],dy[row],dx[col+1]-dx[col],dy[row+1]-dy[row],(tile%8*16+source[col]+.01f)/128,(tile/8*16+source[row]+.01f)/128,(tile%8*16+source[col+1]-.01f)/128,(tile/8*16+source[row+1]-.01f)/128,0xffffffff,true);
+    }
+    public void dirtBackground() { for(int y=0;y<height;y+=32) for(int x=0;x<width;x+=32) tile(2,x,y,32,0xff686868); }
+    public void preview(java.awt.image.BufferedImage image,int x,int y,int size) { assets.preview(image); tile(63,x,y,size,0xffffffff); }
     public void item(Stack stack,float x,float y) {
         if(stack==null) return;
         tile(Assets.tile(stack.item()),x,y,16,0xffffffff);

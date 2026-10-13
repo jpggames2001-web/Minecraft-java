@@ -24,10 +24,10 @@ public final class Renderer implements AutoCloseable {
         ""","""
         #version 330 core
         in vec2 texcoord; in vec3 color; in float sky; in float lamp; in float distanceToEye;
-        uniform sampler2D atlas; uniform float daylight; uniform vec3 fogColor; uniform float fogStart; uniform float fogEnd;
+        uniform sampler2D atlas; uniform float fastLeaves; uniform float daylight; uniform vec3 fogColor; uniform float fogStart; uniform float fogEnd;
         out vec4 result;
         void main() {
-            vec4 tex=texture(atlas,texcoord); if(tex.a<0.1) discard;
+            vec4 tex=texture(atlas,texcoord); if(fastLeaves>.5 && texcoord.x<.125 && texcoord.y>.125 && texcoord.y<.25) tex.a=1; if(tex.a<0.1) discard;
             float level=max(sky*daylight,lamp); float brightness=0.035+0.965*pow(0.8,15.0*(1.0-level));
             vec3 lit=tex.rgb*color*brightness; float fog=smoothstep(fogStart,fogEnd,distanceToEye);
             result=vec4(mix(lit,fogColor,fog),tex.a);
@@ -37,18 +37,30 @@ public final class Renderer implements AutoCloseable {
     private final Mesh[] opaque=new Mesh[16],transparent=new Mesh[16];
     private final Mesh dynamic=new Mesh(),celestialMesh=new Mesh();
     private long revision=Long.MIN_VALUE;
+    private World renderedWorld;
+    private String meshOptions="";
+    public dev.skyblock.client.ClientOptions options;
+    private float eyeOffset;
+
     public int vertices;
     public Renderer() { for(int i=0;i<16;i++) { opaque[i]=new Mesh(); transparent[i]=new Mesh(); } }
     public void draw(Game game,int width,int height,float alpha) {
+        boolean stereo=options!=null && options.flag("anaglyph",false);
+        if(stereo) { glColorMask(true,false,false,true); eyeOffset=-.035f; drawPass(game,width,height,alpha); glColorMask(false,true,true,true); eyeOffset=.035f; drawPass(game,width,height,alpha); glColorMask(true,true,true,true); }
+        else { eyeOffset=0; drawPass(game,width,height,alpha); }
+    }
+    private void drawPass(Game game,int width,int height,float alpha) {
         World w=game.world; Player p=game.player;
         if(game.paused) alpha=1;
-        if(revision!=w.revision) {
+        boolean fancy=options==null || !options.text("graphics","Fancy").equals("Fast"),smooth=options==null || options.flag("smoothLighting",true);
+        String currentOptions=""+fancy+smooth;
+        if(renderedWorld!=w || revision!=w.revision || !meshOptions.equals(currentOptions)) {
             w.updateLighting(); vertices=0;
             for(int i=0;i<16;i++) {
-                Mesh.Builder a=new Mesh.Builder(),b=new Mesh.Builder(); WorldMesher.build(w,i%4,i/4,a,b);
+                Mesh.Builder a=new Mesh.Builder(),b=new Mesh.Builder(); WorldMesher.build(w,i%4,i/4,a,b,fancy,smooth);
                 opaque[i].upload(a); transparent[i].upload(b); vertices+=opaque[i].vertexCount()+transparent[i].vertexCount();
             }
-            revision=w.revision;
+            revision=w.revision; renderedWorld=w; meshOptions=currentOptions;
         }
         float cycle=(w.time%24000+alpha)/24000f;
         float celestial=cycle-.25f; if(celestial<0) celestial++; if(celestial>1) celestial--;
@@ -61,15 +73,22 @@ public final class Renderer implements AutoCloseable {
         if(eye==Block.WATER) { r=.025f; g=.08f; b=.21f; } else if(eye==Block.LAVA) { r=.6f; g=.12f; b=.015f; }
         glViewport(0,0,width,height); glClearColor(r,g,b,1); glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
         glEnable(GL_DEPTH_TEST); glDisable(GL_CULL_FACE); glEnable(GL_BLEND); glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-        shader.use(); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,assets.texture);
+        shader.use(); shader.scalar("fastLeaves",fancy?0:1); glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D,assets.texture);
         double px=p.prevX+(p.x-p.prevX)*alpha,py=p.prevY+(p.y-p.prevY)*alpha+(p.sneaking?1.54:1.62),pz=p.prevZ+(p.z-p.prevZ)*alpha;
-        double[] dir=p.direction();
+        double[] dir=p.direction(); double yaw=Math.toRadians(p.yaw); px+=Math.cos(yaw)*eyeOffset; pz+=Math.sin(yaw)*eyeOffset;
+        int distance=options==null?96:options.distance();
         Matrix4f view=new Matrix4f().lookAt((float)px,(float)py,(float)pz,(float)(px+dir[0]),(float)(py+dir[1]),(float)(pz+dir[2]),0,1,0);
-        Matrix4f projection=new Matrix4f().perspective((float)Math.toRadians(p.sprinting?78:70),width/(float)Math.max(1,height),.05f,160);
+        Matrix4f projection=new Matrix4f().perspective((float)Math.toRadians(p.sprinting?78:70),width/(float)Math.max(1,height),.05f,Math.max(100,distance+32));
         shader.matrix("view",view); shader.matrix("projection",projection); shader.scalar("daylight",.18f+day*.82f);
-        shader.vector("fogColor",r,g,b); shader.scalar("fogStart",eye.fluid()?0:48); shader.scalar("fogEnd",eye.fluid()?eye==Block.WATER?16:4:100);
+        shader.vector("fogColor",r,g,b); shader.scalar("fogStart",eye.fluid()?0:distance*.5f); shader.scalar("fogEnd",eye.fluid()?eye==Block.WATER?16:4:distance);
         if(!eye.fluid()) drawCelestial(px,py,pz,celestial,day);
-        for(Mesh m:opaque) m.draw();
+        org.joml.FrustumIntersection frustum=new org.joml.FrustumIntersection(new Matrix4f(projection).mul(view));
+        boolean[] visible=new boolean[16];
+        for(int i=0;i<16;i++) {
+            float x=i%4*16,z=i/4*16;
+            visible[i]=options==null || !options.flag("advancedOpenGL",false) || frustum.testAab(x,0,z,x+16,128,z+16);
+            if(visible[i]) opaque[i].draw();
+        }
         Mesh.Builder entities=new Mesh.Builder();
         for(Drop d:game.drops) WorldMesher.cube(entities,(float)d.x-.1f,(float)(d.y+Math.sin((d.age+alpha)*.12)*.05),(float)d.z-.1f,.2f,Assets.tile(d.stack.item()),1);
         if(game.target!=null) {
@@ -81,7 +100,7 @@ public final class Renderer implements AutoCloseable {
         dynamic.upload(entities); dynamic.draw();
         Integer[] order=new Integer[16]; for(int i=0;i<16;i++) order[i]=i;
         Arrays.sort(order,Comparator.comparingDouble((Integer i)->-(Math.pow(i%4*16+8-p.x,2)+Math.pow(i/4*16+8-p.z,2))));
-        glDepthMask(false); for(int i:order) transparent[i].draw(); glDepthMask(true);
+        glDepthMask(false); for(int i:order) if(visible[i]) transparent[i].draw(); glDepthMask(true);
         if(game.player.health>0 && !game.paused) drawHand(game,alpha,width,height);
     }
     private void drawCelestial(double x,double y,double z,float angle,float day) {
@@ -98,7 +117,7 @@ public final class Renderer implements AutoCloseable {
         }
         shader.scalar("fogStart",10000); shader.scalar("fogEnd",10001);
         glDepthMask(false); celestialMesh.upload(sky); celestialMesh.draw(); glDepthMask(true);
-        shader.scalar("fogStart",48); shader.scalar("fogEnd",100);
+        shader.scalar("fogStart",options==null?48:options.distance()*.5f); shader.scalar("fogEnd",options==null?96:options.distance());
     }
     private void drawHand(Game game,float alpha,int width,int height) {
         Player p=game.player; float bob=(float)Math.sin((game.world.time+alpha)*.6)*(.01f+(float)Math.hypot(p.vx,p.vz)*.08f);
