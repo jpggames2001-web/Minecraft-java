@@ -43,7 +43,7 @@ mvn -B clean verify
 powershell -ExecutionPolicy Bypass -File scripts/run.ps1
 ```
 
-The Windows Maven profile selects `natives-windows` automatically. Build separately on each platform; a Linux JAR includes Linux natives. Windows builds and simulation tests are configured in GitHub Actions but **has not run on an actual Windows machine in this session**.
+The Windows Maven profile selects `natives-windows` automatically. Build separately on each platform; a Linux JAR includes Linux natives. Windows builds and simulation tests are configured in GitHub Actions but **have not run on an actual Windows machine in this session**.
 
 ### This cloud workspace
 
@@ -75,6 +75,12 @@ The cloud machine has a virtual display for automated graphics checks. Onboardin
 | Pause | Esc |
 | Inventory move / split / transfer | Left click / right click / Shift-click |
 | Eat | Hold right mouse with food selected |
+
+Open **Esc → Controls** (or Controls on the title screen) to view the current keybindings, toggle **Invert Mouse X** and **Invert Mouse Y**, and adjust sensitivity with **− / +**. Both axes default to OFF. Moving the mouse right turns right, and moving it down looks down; each inversion changes only its own axis. Reset Mouse Defaults restores non-inverted controls and the original sensitivity (100% = 0.15 degrees per cursor pixel).
+
+Changes are saved immediately to `~/.skyblock-classic/controls.properties`, independently of world saves. To use another file, launch with `--settings local/controls.properties`. If a setting cannot be saved, the controls screen displays the error and retains the previous saved setting. Keyboard bindings are displayed for reference; rebinding is not implemented.
+
+Existing version-1 worlds load with their camera orientation preserved. New saves use version 2 to record the corrected yaw convention; older binaries cannot load version-2 saves.
 
 Start by opening the chest, collecting the starter supplies, harvesting the tree, and crafting planks, sticks, a table and a wooden pickaxe. Ice above solid ground becomes water when broken. Put water next to **flowing** lava to produce cobblestone; water beside a lava source produces obsidian. Keep a sapling and avoid losing essential supplies into the void.
 

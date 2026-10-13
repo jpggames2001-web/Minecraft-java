@@ -30,6 +30,8 @@ No Arch Linux, o Java pode ser instalado com `sudo pacman -S jre21-openjdk`. A c
 
 WASD para mover, mouse para olhar, espaço para pular, Shift para agachar, Ctrl para correr, clique esquerdo para quebrar, direito para usar/colocar, E para inventário, R para receitas e Esc para pausar. Abra o baú para retirar os itens iniciais. F2 salva uma captura de tela; F3 mostra informações de depuração.
 
+Abra **Esc → Controls** para inverter X/Y separadamente ou ajustar a sensibilidade do mouse. As mudanças são salvas imediatamente em `.skyblock-classic/controls.properties`, na pasta do seu usuário, e permanecem após fechar o jogo. Os dois eixos vêm sem inversão por padrão. O menu também mostra as teclas atuais; não permite remapeá-las.
+
 O mundo é salvo automaticamente ao sair, em `.skyblock-classic/world.dat` dentro da pasta do seu usuário. Para testar com um arquivo separado:
 
 ```bash

@@ -4,6 +4,7 @@ import dev.skyblock.audio.SynthAudio;
 import dev.skyblock.game.*;
 import dev.skyblock.game.Stack;
 import dev.skyblock.persistence.SaveStore;
+import dev.skyblock.persistence.MouseSettingsStore;
 import dev.skyblock.render.Renderer;
 import dev.skyblock.ui.*;
 import dev.skyblock.world.World;
@@ -20,8 +21,11 @@ import static org.lwjgl.system.MemoryUtil.NULL;
 public final class Main {
     private long window;
     private int width=1280,height=720,windowWidth=1280,windowHeight=720;
-    private double cursorX,cursorY,lastMouseX,lastMouseY;
-    private boolean firstMouse=true,captured;
+    private double cursorX,cursorY;
+    private boolean captured;
+    private final MouseLook mouseLook=new MouseLook();
+    private MouseSettingsStore mouseSettings;
+    private Path activeSettingsPath;
     private final Set<Integer> pressed=new HashSet<>();
     private final List<Integer> clicks=new ArrayList<>();
     private double scroll;
@@ -37,6 +41,16 @@ public final class Main {
         catch(Exception e) { System.err.println("Unable to run Skyblock Classic: "+e.getMessage()); e.printStackTrace(System.err); System.exit(1); }
     }
     private void run() throws Exception {
+        Path temporarySettings=options.smoke>0?Files.createTempDirectory("skyblock-smoke-controls-"):null;
+        try {
+            activeSettingsPath=temporarySettings==null?options.settings:temporarySettings.resolve("controls.properties");
+            mouseSettings=MouseSettingsStore.load(activeSettingsPath);
+            runDesktop();
+        } finally {
+            if(temporarySettings!=null) { Files.deleteIfExists(temporarySettings.resolve("controls.properties")); Files.deleteIfExists(temporarySettings); }
+        }
+    }
+    private void runDesktop() throws Exception {
         GLFWErrorCallback error=GLFWErrorCallback.createPrint(System.err); error.set();
         if(!glfwInit()) { error.free(); throw new IllegalStateException("GLFW initialization failed. A graphical desktop (X11/Wayland or Windows) is required."); }
         try {
@@ -53,7 +67,7 @@ public final class Main {
                 } else game=new Game(World.skyblock(),new Player(),audio);
                 game.player.physics=options.physics;
                 if(options.creative) game.creativeKit();
-                ui=new Interface(game,canvas); game.paused=true;
+                ui=new Interface(game,canvas,mouseSettings); game.paused=true;
                 if(options.smoke>0) ui.set(Interface.Screen.GAME);
                 loop();
                 ui.close();
@@ -69,10 +83,7 @@ public final class Main {
         glfwSetWindowSizeCallback(window,(w,x,y)->{windowWidth=x;windowHeight=y;});
         glfwSetCursorPosCallback(window,(w,x,y)-> {
             cursorX=x; cursorY=y;
-            if(captured && game!=null) {
-                if(!firstMouse) { game.player.yaw+=(float)((x-lastMouseX)*.15); game.player.pitch=Math.clamp(game.player.pitch+(float)((y-lastMouseY)*.15),-89.9f,89.9f); }
-                firstMouse=false; lastMouseX=x; lastMouseY=y;
-            }
+            if(game!=null && ui!=null && ui.screen==Interface.Screen.GAME) mouseLook.cursor(game.player,x,y,mouseSettings.value());
         });
         glfwSetKeyCallback(window,(w,key,scan,action,mods)->{if(action==GLFW_PRESS) pressed.add(key);});
         glfwSetMouseButtonCallback(window,(w,button,action,mods)->{if(action==GLFW_PRESS) clicks.add(button);});
@@ -109,7 +120,7 @@ public final class Main {
             if(scroll!=0) { game.player.selected=Math.floorMod(game.player.selected-(int)Math.signum(scroll),9); scroll=0; }
             if(pressed.contains(GLFW_KEY_Q) && ui.screen==Interface.Screen.GAME) game.dropHeld();
             boolean wantCapture=ui.screen==Interface.Screen.GAME;
-            if(wantCapture!=captured) { captured=wantCapture; firstMouse=true; glfwSetInputMode(window,GLFW_CURSOR,captured?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL); }
+            if(wantCapture!=captured) { captured=wantCapture; mouseLook.capture(captured); glfwSetInputMode(window,GLFW_CURSOR,captured?GLFW_CURSOR_DISABLED:GLFW_CURSOR_NORMAL); }
             long now=System.nanoTime();
             accumulator+=Math.min(.25,(now-previous)/1e9); previous=now;
             Controls controls=controls();
@@ -124,7 +135,7 @@ public final class Main {
             if(options.smoke>0) {
                 if(frames==20) smokeInventory();
                 if(frames==40) ui.set(Interface.Screen.GAME);
-                if(frames==60) ui.recipeKey();
+                if(frames==60) smokeControls();
                 if(frames==80) ui.set(Interface.Screen.GAME);
             }
             if(width>0 && height>0) {
@@ -175,15 +186,43 @@ public final class Main {
         System.out.println("UI SMOKE PASS take/place/split/transfer/craft/close");
     }
     private void smokeClick(int x,int y,int button,boolean shift,int scale) { ui.draw(width,height,x*scale,y*scale,0,renderer.vertices); ui.click(button,shift); }
+    private void smokeControls() throws Exception {
+        ui.escape(); require(ui.screen==Interface.Screen.PAUSE && game.paused,"ESC pauses gameplay");
+        int scale=Math.max(1,Math.min(width/640,height/360)),w=width/scale,h=height/scale;
+        smokeClick(w/2,h/2+2,0,false,scale);
+        require(ui.screen==Interface.Screen.CONTROLS && game.paused,"open controls from pause");
+        int x=w/2-245,y=h/2-143;
+        smokeClick(x+360,y+58,0,false,scale);
+        smokeClick(x+360,y+87,0,false,scale);
+        smokeClick(x+420,y+164,0,false,scale);
+        MouseSettings changed=mouseSettings.value();
+        require(changed.invertX() && changed.invertY() && changed.sensitivity()>MouseSettings.DEFAULT.sensitivity(),"toggle both axes and sensitivity");
+        require(MouseSettingsStore.load(activeSettingsPath).value().equals(changed),"settings survive reload");
+        Player probe=new Player(); probe.yaw=probe.pitch=0; MouseLook look=new MouseLook(); look.capture(true);
+        look.cursor(probe,100,100,changed); look.cursor(probe,110,110,changed);
+        require(probe.yaw<0 && probe.pitch<0,"inverted controls change both look axes");
+        ui.inventoryKey(); ui.recipeKey();
+        require(ui.screen==Interface.Screen.CONTROLS && game.paused,"gameplay shortcuts do not close controls");
+        ui.escape(); require(ui.screen==Interface.Screen.PAUSE && game.paused,"ESC returns to pause");
+        smokeClick(w/2,h/2+2,0,false,scale);
+        renderer.draw(game,width,height,1);
+        ui.draw(width,height,0,0,0,renderer.vertices);
+        renderer.screenshot(Path.of("target/smoke-controls.png"),width,height);
+        smokeClick(x+360,y+198,0,false,scale);
+        require(mouseSettings.value().equals(MouseSettings.DEFAULT),"reset mouse defaults");
+        System.out.println("CONTROLS SMOKE PASS menu/toggles/sensitivity/persistence/escape/reset");
+    }
     private static void require(boolean condition,String behavior) { if(!condition) throw new IllegalStateException("UI smoke failed: "+behavior); }
     private static final class Options {
         Path save=Path.of(System.getProperty("user.home"),".skyblock-classic","world.dat"),screenshot,trace;
+        Path settings=Path.of(System.getProperty("user.home"),".skyblock-classic","controls.properties");
         boolean fresh,creative,noAudio,help; int smoke;
         PhysicsProfile physics=PhysicsProfile.SPECIFIED;
         static final String HELP="""
             Skyblock Classic (Java 21 / OpenGL 3.3)
             java -jar target/skyblock-classic-0.1.0.jar [options]
               --save PATH          Save file (default ~/.skyblock-classic/world.dat)
+              --settings PATH      Mouse settings (default ~/.skyblock-classic/controls.properties)
               --fresh              Start a new island; replaces selected save on exit
               --creative           Unlimited placement, no hunger/damage, starter palette
               --physics specified  Supplied constants (default); release-reference also available
@@ -199,6 +238,7 @@ public final class Main {
             for(int i=0;i<args.length;i++) switch(args[i]) {
                 case "--trace" -> o.trace=Path.of(value(args,++i));
                 case "--save" -> o.save=Path.of(value(args,++i));
+                case "--settings" -> o.settings=Path.of(value(args,++i));
                 case "--screenshot" -> o.screenshot=Path.of(value(args,++i));
                 case "--smoke" -> { o.smoke=Integer.parseInt(value(args,++i)); if(o.smoke<1 || o.smoke>10000) throw new IllegalArgumentException("Smoke frames must be 1..10000"); }
                 case "--physics" -> o.physics=switch(value(args,++i)) { case "specified" -> PhysicsProfile.SPECIFIED; case "release-reference" -> PhysicsProfile.RELEASE_REFERENCE; default -> throw new IllegalArgumentException("Unknown physics profile"); };

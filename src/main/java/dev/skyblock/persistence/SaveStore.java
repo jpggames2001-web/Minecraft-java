@@ -9,7 +9,7 @@ import java.util.*;
 import java.util.zip.*;
 
 public final class SaveStore {
-    private static final int MAGIC=0x534B4231, VERSION=1;
+    private static final int MAGIC=0x534B4231, VERSION=2;
     public record Saved(World world,Player player,List<Drop> drops) {}
     private SaveStore() {}
     public static void save(Path path,Game game) throws IOException {
@@ -44,7 +44,8 @@ public final class SaveStore {
     }
     public static Saved load(Path path) throws IOException {
         try(DataInputStream in=new DataInputStream(new BufferedInputStream(new GZIPInputStream(Files.newInputStream(path))))) {
-            if(in.readInt()!=MAGIC || in.readInt()!=VERSION) throw new IOException("Unsupported save format");
+            int magic=in.readInt(),version=in.readInt();
+            if(magic!=MAGIC || version<1 || version>VERSION) throw new IOException("Unsupported save format");
             World w=new World(); w.time=in.readLong(); w.randomState=in.readLong();
             if(w.time<0 || w.time>Long.MAX_VALUE-100000 || w.randomState==0) throw new IOException("Invalid world clock or random state");
             w.restore(in.readNBytes(World.VOLUME),in.readNBytes(World.VOLUME),in.readNBytes(World.SIZE*World.SIZE));
@@ -55,6 +56,7 @@ public final class SaveStore {
             p.x=coordinate(in); p.y=coordinate(in); p.z=coordinate(in); p.vx=coordinate(in); p.vy=coordinate(in); p.vz=coordinate(in);
             p.prevX=p.x; p.prevY=p.y; p.prevZ=p.z;
             p.yaw=finite(in.readFloat()); p.pitch=finite(in.readFloat()); p.onGround=in.readBoolean(); p.creative=in.readBoolean(); p.physics=PhysicsProfile.values()[range(in,0,PhysicsProfile.values().length-1)];
+            if(version==1) p.yaw=-p.yaw; // Preserve the view direction of saves using the old yaw convention.
             p.health=range(in,0,20); p.food=range(in,0,20); p.air=range(in,-20,300); p.hurtTicks=range(in,0,20); p.selected=range(in,0,8); p.foodTimer=range(in,0,80);
             p.saturation=finite(in.readFloat()); p.exhaustion=finite(in.readFloat()); p.fallDistance=finite(in.readFloat());
             if(p.saturation<0 || p.saturation>20 || p.exhaustion<0 || p.exhaustion>40 || p.fallDistance<0) throw new IOException("Invalid player state");

@@ -6,7 +6,7 @@ import java.util.List;
 /** Velocities are blocks per fixed 20 Hz tick, as in the release-era simulation. */
 public final class Player {
     public double x=31.5,y=65,z=30.5,prevX=x,prevY=y,prevZ=z,vx,vy,vz;
-    public float yaw=-135,pitch=12;
+    public float yaw=135,pitch=12;
     public boolean onGround,sneaking,sprinting,creative;
     public PhysicsProfile physics=PhysicsProfile.SPECIFIED;
     public int health=20,food=20,air=300,hurtTicks,selected,foodTimer;
@@ -16,7 +16,7 @@ public final class Player {
     public double eyeY() { return y+(sneaking?1.54:1.62); }
     public double[] direction() {
         double a=Math.toRadians(yaw),p=Math.toRadians(pitch);
-        return new double[]{-Math.sin(a)*Math.cos(p),-Math.sin(p),-Math.cos(a)*Math.cos(p)};
+        return new double[]{Math.sin(a)*Math.cos(p),-Math.sin(p),-Math.cos(a)*Math.cos(p)};
     }
     public Stack held() { return inventory.get(selected); }
     public void tick(World world,Controls input) {
@@ -31,7 +31,7 @@ public final class Player {
             if(water || lava) vy+=.04;
             else if(onGround) {
                 vy=.42;
-                if(sprinting) { double a=Math.toRadians(yaw); vx-=Math.sin(a)*.2; vz-=Math.cos(a)*.2; }
+                if(sprinting) { double a=Math.toRadians(yaw); vx+=Math.sin(a)*.2; vz-=Math.cos(a)*.2; }
                 exhaust(sprinting?.8f:.2f);
             }
         }
@@ -72,8 +72,8 @@ public final class Player {
     private void accelerate(float forward,float strafe,double acceleration) {
         double mag=Math.hypot(forward,strafe); if(mag<.01) return;
         double scale=acceleration/Math.max(1,mag),a=Math.toRadians(yaw);
-        vx+=(strafe*Math.cos(a)-forward*Math.sin(a))*scale;
-        vz+=(-strafe*Math.sin(a)-forward*Math.cos(a))*scale;
+        vx+=(strafe*Math.cos(a)+forward*Math.sin(a))*scale;
+        vz+=(strafe*Math.sin(a)-forward*Math.cos(a))*scale;
     }
     public void move(World world,double dx,double dy,double dz,boolean edgeGuard) {
         Aabb start=box();

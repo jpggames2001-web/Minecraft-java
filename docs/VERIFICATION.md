@@ -4,16 +4,18 @@ Validated on 2026-10-13 in the provided Debian Linux x86-64 cloud workspace usin
 
 ## Build and test results
 
-A clean Linux `verify` build completed successfully. A separate build with the Windows Maven profile completed successfully on this Linux machine. Both executed the same **52 tests**, with **0 failures, 0 errors, 0 skipped**:
+A clean Linux `verify` build completed successfully. A separate build with the Windows Maven profile completed successfully on this Linux machine. Both executed the same **72 tests**, with **0 failures, 0 errors, 0 skipped**:
 
 | Suite | Tests | Behavior covered |
 |---|---:|---|
 | PhysicsTest | 11 | dimensions, eye height, gravity/drag profiles, jump apex, walking/sprint speeds, diagonal input, water drag/buoyancy, walls, sneak edges, fall damage and AABB clipping |
 | WorldTest | 11 | starter layout, light emission/removal/occlusion, sky shadowing, renewable water, lava reactions, targeting faces/reach, sand, tree space/soil, save ID validation and biome colors |
 | InventoryTest | 10 | overflow, tool metadata, recipes/mirroring/grid limits, ingredient preservation, furnace duration/full outputs/fuel buckets and durability |
-| SaveTest | 4 | full state round trip, deterministic scheduled-fluid continuation, corrupt-save preservation and repeated atomic saves |
+| SaveTest | 6 | state round trip, deterministic scheduled-fluid continuation, corrupt-save preservation, atomic saves, legacy-yaw migration and future-version rejection |
 | GameTest | 12 | placement/overlap, container opening, buckets, hoes/crops, mining/tool wear/drops, harvesting rules, eating duration, pickup overflow, void death/respawn, creative placement and generated PCM |
 | ClimateTest | 4 | biome IDs, temperature clamping/wetness, swamp override and furnace ignition/extinction light |
+| MouseLookTest | 12 | real camera turn direction, independent inversion, sensitivity/clamping, capture transitions, runtime setting changes, movement/sprint consistency and block targeting |
+| MouseSettingsTest | 6 | defaults, session persistence, invalid values, failed-write behavior, reset/atomic saves and sensitivity bounds |
 
 Commands actually exercised:
 
@@ -36,19 +38,21 @@ The latest runs reported:
 
 ```text
 UI SMOKE PASS take/place/split/transfer/craft/close
+CONTROLS SMOKE PASS menu/toggles/sensitivity/persistence/escape/reset
 SMOKE PASS frames=120 ticks=100 vertices=2124 health=20
 UI SMOKE PASS take/place/split/transfer/craft/close
 SMOKE PASS frames=35 ticks=35 vertices=2124 health=20
 ```
 
-These checks execute native shader compilation, buffer uploads, generated textures, world rendering and UI rendering. They also use the actual GUI slot coordinates and click handlers to take logs, put one ingredient into the grid, craft planks, split a stack, Shift-transfer it, and verify conservation when the cursor/grid close. Each frame checks `glGetError`. The expected tick count excludes the deliberately paused recipe screen and is asserted. A nonempty generated world mesh and living player are required.
+These checks execute native shader compilation, buffer uploads, generated textures, world rendering and UI rendering. They also use the actual GUI slot coordinates and click handlers to take logs, put one ingredient into the grid, craft planks, split a stack, Shift-transfer it, and verify conservation when the cursor/grid close. The controls smoke check opens Esc → Controls, toggles both axes, increases sensitivity, reloads the properties file, verifies inverted deltas, returns to pause with Esc, and resets defaults. Smoke preferences are isolated in a fresh temporary directory and never write the user’s actual controls file. Each frame checks `glGetError`. The expected tick count excludes the deliberately paused controls screen and is asserted. A nonempty generated world mesh and living player are required.
 
 Screenshots:
 
 - `target/smoke-game.png`: gameplay, biome-colored island/tree, HUD and first-person geometry.
 - `target/smoke-inventory.png`: inventory/crafting screen over the rendered world.
+- `target/smoke-controls.png`: Controls screen with both axes inverted and sensitivity changed to 117%.
 
-Screenshots are captured from the actual framebuffer using Java ImageIO; no images were downloaded or imported. The earlier game screenshot was visually inspected during development. These are evidence of the implementation rendering, **not** comparisons with original Minecraft frames.
+Screenshots are captured from the actual framebuffer using Java ImageIO; no images were downloaded or imported. The gameplay and Controls screenshots were visually inspected during development. These are evidence of the implementation rendering, **not** comparisons with original Minecraft frames.
 
 The two trace CSVs contain 160 rows of reproducible tick inputs/positions/velocities each, plus a header. They run without GLFW/display initialization. They are not original-game reference traces.
 
@@ -58,8 +62,8 @@ The final platform-specific archives are in `target/distribution`:
 
 | Archive | Verified contents | SHA-256 |
 |---|---|---|
-| `skyblock-classic-linux-0.1.0.jar` | 3 Linux native `.so` libraries, Java classes and manifest | `dd084bf9bdb45cf46e59154f6d83527b4969fc73a4314c37c332a12055e03390` |
-| `skyblock-classic-windows-0.1.0.jar` | 3 Windows x64 native `.dll` libraries, Java classes and manifest | `ee28fb4401aaf5b1d76970c4fbb9a80d4b67c1f3aec052ad0a8d8d1d9e2a86bf` |
+| `skyblock-classic-linux-0.1.0.jar` | 3 Linux native `.so` libraries, Java classes and manifest | `9ea72cf5ed49484b7ab4ee771caee53de16c3111ccf8ff26c3c2c92618c3e090` |
+| `skyblock-classic-windows-0.1.0.jar` | 3 Windows x64 native `.dll` libraries, Java classes and manifest | `953f9ebc2ba0f9298dc47d923603bb6b8ceedc83e9bbc20d084a49babc015960` |
 
 The build recreates the unshaded application JAR before shading on every package invocation, so repeated packaging does not recursively absorb a previously shaded JAR. The final default `target/skyblock-classic-0.1.0.jar` contains Linux natives.
 

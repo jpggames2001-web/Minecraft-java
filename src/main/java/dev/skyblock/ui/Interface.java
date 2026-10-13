@@ -3,15 +3,20 @@ package dev.skyblock.ui;
 import dev.skyblock.game.*;
 import dev.skyblock.game.Stack;
 import dev.skyblock.world.*;
+import dev.skyblock.persistence.MouseSettingsStore;
+import java.io.IOException;
 import java.util.*;
 
 public final class Interface {
-    public enum Screen { TITLE, GAME, PAUSE, INVENTORY, CRAFT, CHEST, FURNACE, RECIPES, DEAD }
+    public enum Screen { TITLE, GAME, PAUSE, INVENTORY, CRAFT, CHEST, FURNACE, RECIPES, DEAD, CONTROLS }
     public Screen screen=Screen.TITLE;
     public Stack carried;
     private Inventory grid=new Inventory(4);
     private final Game game;
     private final Canvas canvas;
+    private final MouseSettingsStore mouseSettings;
+    private Screen controlsPrevious=Screen.PAUSE;
+    private boolean settingsSaveFailed;
     private final List<Slot> slots=new ArrayList<>();
     private final List<Button> buttons=new ArrayList<>();
     private int mouseX,mouseY,recipePage;
@@ -19,7 +24,7 @@ public final class Interface {
     public boolean quit,saveRequested;
     private record Slot(Inventory inventory,int index,int x,int y,boolean output,boolean crafted) {}
     private record Button(int x,int y,int width,int height,Runnable action) {}
-    public Interface(Game game,Canvas canvas) { this.game=game; this.canvas=canvas; }
+    public Interface(Game game,Canvas canvas,MouseSettingsStore mouseSettings) { this.game=game; this.canvas=canvas; this.mouseSettings=mouseSettings; }
     public void set(Screen next) {
         if(screen==Screen.INVENTORY || screen==Screen.CRAFT) {
             for(int i=0;i<grid.size();i++) returnItem(grid.take(i,64));
@@ -37,11 +42,19 @@ public final class Interface {
             case GAME -> set(Screen.PAUSE);
             case TITLE -> quit=true;
             case RECIPES -> set(previous);
+            case CONTROLS -> set(controlsPrevious);
             default -> set(Screen.GAME);
         }
     }
-    public void inventoryKey() { if(screen==Screen.GAME) set(Screen.INVENTORY); else if(screen!=Screen.TITLE && screen!=Screen.DEAD) set(Screen.GAME); }
-    public void recipeKey() { if(screen!=Screen.RECIPES) { previous=screen; set(Screen.RECIPES); } else set(previous); }
+    public void inventoryKey() {
+        if(screen==Screen.GAME) set(Screen.INVENTORY);
+        else if(screen==Screen.INVENTORY || screen==Screen.CRAFT || screen==Screen.CHEST || screen==Screen.FURNACE) set(Screen.GAME);
+    }
+    public void recipeKey() {
+        if(screen==Screen.RECIPES) set(previous);
+        else if(screen==Screen.GAME || screen==Screen.PAUSE || screen==Screen.TITLE) { previous=screen; set(Screen.RECIPES); }
+    }
+    private void openControls() { controlsPrevious=screen; set(Screen.CONTROLS); }
     public void draw(int width,int height,double mx,double my,int fps,int vertices) {
         canvas.begin(width,height); mouseX=(int)mx/canvas.scale; mouseY=(int)my/canvas.scale;
         slots.clear(); buttons.clear();
@@ -51,19 +64,22 @@ public final class Interface {
             canvas.centered("SKYBLOCK CLASSIC",canvas.height/2f-90,0xffe3dfd0,4);
             canvas.centered("ORIGINAL PROCEDURAL ART - JAVA 21",canvas.height/2f-46,0xffcbbc85,1);
             button("PLAY SKYBLOCK",canvas.width/2-110,canvas.height/2-5,220,()->set(Screen.GAME));
-            button("CONTROLS AND RECIPES",canvas.width/2-110,canvas.height/2+22,220,()->{previous=Screen.TITLE;set(Screen.RECIPES);});
-            button("SAVE AND QUIT",canvas.width/2-110,canvas.height/2+49,220,()->{saveRequested=true;quit=true;});
+            button("CONTROLS",canvas.width/2-110,canvas.height/2+22,220,this::openControls);
+            button("RECIPES",canvas.width/2-110,canvas.height/2+49,220,()->{previous=Screen.TITLE;set(Screen.RECIPES);});
+            button("SAVE AND QUIT",canvas.width/2-110,canvas.height/2+76,220,()->{saveRequested=true;quit=true;});
             canvas.centered("INDEPENDENT IMPLEMENTATION - SEE FIDELITY.MD",canvas.height-20,0xffbbb8b0,1);
         } else if(screen==Screen.PAUSE) {
-            dim(); canvas.centered("GAME PAUSED",canvas.height/2f-60,0xffffffff,2);
-            button("RETURN TO GAME",canvas.width/2-100,canvas.height/2-20,200,()->set(Screen.GAME));
-            button("CONTROLS AND RECIPES",canvas.width/2-100,canvas.height/2+7,200,()->{previous=Screen.PAUSE;set(Screen.RECIPES);});
-            button("SAVE AND QUIT",canvas.width/2-100,canvas.height/2+34,200,()->{saveRequested=true;quit=true;});
+            dim(); canvas.centered("GAME PAUSED",canvas.height/2f-75,0xffffffff,2);
+            button("RETURN TO GAME",canvas.width/2-100,canvas.height/2-35,200,()->set(Screen.GAME));
+            button("CONTROLS",canvas.width/2-100,canvas.height/2-8,200,this::openControls);
+            button("RECIPES",canvas.width/2-100,canvas.height/2+19,200,()->{previous=Screen.PAUSE;set(Screen.RECIPES);});
+            button("SAVE AND QUIT",canvas.width/2-100,canvas.height/2+46,200,()->{saveRequested=true;quit=true;});
         } else if(screen==Screen.DEAD) {
             canvas.rect(0,0,canvas.width,canvas.height,0xb0751515); canvas.centered("YOU DIED",canvas.height/2f-50,0xffffffff,3);
             button("RESPAWN",canvas.width/2-90,canvas.height/2,180,()->{game.player.respawn();set(Screen.GAME);});
             button("SAVE AND QUIT",canvas.width/2-90,canvas.height/2+27,180,()->{saveRequested=true;quit=true;});
         } else if(screen==Screen.RECIPES) recipes();
+        else if(screen==Screen.CONTROLS) controlsSettings();
         else inventory();
         if(game.messageTicks>0) canvas.centered(game.message,canvas.height-50,0xffffff80,1);
         canvas.finish();
@@ -134,7 +150,7 @@ public final class Interface {
     }
     public void click(int button,boolean shift) {
         for(Button b:buttons) if(inside(b.x,b.y,b.width,b.height)) { if(button==0) b.action.run(); return; }
-        if(screen==Screen.GAME || screen==Screen.PAUSE || screen==Screen.TITLE || screen==Screen.DEAD) return;
+        if(screen==Screen.GAME || screen==Screen.PAUSE || screen==Screen.TITLE || screen==Screen.DEAD || screen==Screen.CONTROLS) return;
         Slot s=slots.stream().filter(slot->inside(slot.x,slot.y,16,16)).findFirst().orElse(null);
         if(s==null) { if(carried!=null && screen!=Screen.RECIPES) { game.spawnDrop(carried,game.player.x,game.player.y,game.player.z); carried=null; } return; }
         Stack in=s.inventory.get(s.index);
@@ -179,6 +195,28 @@ public final class Interface {
                 Stack made=Recipes.craft(grid,size,size); carried=carried==null?made:carried.withCount(carried.count()+made.count());
             }
         }
+    }
+    private void controlsSettings() {
+        dim(); int x=canvas.width/2-245,y=canvas.height/2-143;
+        canvas.rect(x,y,490,286,0xf02b2b29); canvas.border(x,y,490,286,0xffb4a587);
+        canvas.text("CONTROLS",x+12,y+12,0xffe8d39a,2);
+        canvas.text("CURRENT KEYBINDINGS",x+12,y+37,0xffe8d39a,1);
+        String[] bindings={"WASD - MOVE","MOUSE - LOOK","SPACE - JUMP / SWIM UP","SHIFT - SNEAK","CTRL / DOUBLE W - SPRINT","LEFT MOUSE - BREAK","RIGHT MOUSE - PLACE / USE","1-9 / WHEEL - HOTBAR","E - INVENTORY / Q - DROP","R - RECIPES / ESC - PAUSE","F2 - SCREENSHOT / F3 - DEBUG"};
+        for(int i=0;i<bindings.length;i++) canvas.text(bindings[i],x+12,y+55+i*15,0xffdedbd3,1);
+        MouseSettings settings=mouseSettings.value();
+        button("INVERT MOUSE X: "+(settings.invertX()?"ON":"OFF"),x+255,y+48,223,()->updateMouseSettings(mouseSettings.value().toggleX()));
+        button("INVERT MOUSE Y: "+(settings.invertY()?"ON":"OFF"),x+255,y+77,223,()->updateMouseSettings(mouseSettings.value().toggleY()));
+        canvas.text("SENSITIVITY: "+Math.round(settings.sensitivity()/MouseSettings.DEFAULT.sensitivity()*100)+"%",x+258,y+114,0xffffffff,1);
+        canvas.text(String.format(Locale.ROOT,"%.3f DEG/PIXEL",settings.sensitivity()),x+258,y+129,0xffdedbd3,1);
+        button("-",x+255,y+154,105,()->updateMouseSettings(mouseSettings.value().adjustSensitivity(-.025)));
+        button("+",x+373,y+154,105,()->updateMouseSettings(mouseSettings.value().adjustSensitivity(.025)));
+        button("RESET MOUSE DEFAULTS",x+255,y+188,223,()->updateMouseSettings(MouseSettings.DEFAULT));
+        canvas.text(settingsSaveFailed?"SAVE FAILED - CHECK FILE ACCESS":"CHANGES SAVE AUTOMATICALLY",x+255,y+235,settingsSaveFailed?0xffff9a70:0xffaaa693,1);
+        button("BACK",x+12,y+251,180,()->set(controlsPrevious));
+    }
+    private void updateMouseSettings(MouseSettings settings) {
+        try { mouseSettings.save(settings); settingsSaveFailed=false; }
+        catch(IOException e) { settingsSaveFailed=true; System.err.println("Unable to save mouse settings: "+e.getMessage()); }
     }
     private void recipes() {
         dim(); int x=canvas.width/2-245,y=canvas.height/2-150;
